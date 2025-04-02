@@ -1,0 +1,102 @@
+config:
+  aws:defaultTags:
+    tags:
+      Service: aimp
+      Environment: oss-test
+  aws:region: ap-northeast-2
+  aimp:AccountId: <account id>
+  aimp:Env: oss-test
+  aimp:ResourceTimeout: 5m
+  aimp:DefaultPrefix: aimp
+  aimp:ApiVersion: oss-test
+
+  # [To Do]
+  # Make VPC Configuration as stack reference
+  #######################################
+  ##### VPC Configuration ###############
+  #######################################
+
+  aimp:VpcId: <vpc id>
+  aimp:VpcSecurityGroupId: <security group id>
+  aimp:VpcPrivateSubnetId0: <vpc subnet id 0>
+  aimp:VpcPrivateSubnetId1: <vpc subnet id 1>
+  aimp:VpcPrivateSubnetId2: <vpc subnet id 2>
+
+  #######################################
+  ##### Global Lambda Configuration #####
+  #######################################
+
+  aimp:DefaultLambdaTimeout: 30
+  aimp:DefaultLambdaStorageSizeMB: 4096
+  aimp:DefaultLambdaMemorySizeMB: 4096
+  aimp:CommandControllerTimeout: 600
+  aimp:LogRetentionInDays: 7
+  aimp:LambdaLogFormat: JSON
+  aimp:LambdaApplicationLogLevel: INFO
+  aimp:LambdaSystemLogLevel: INFO
+
+  aimp:WalPayloadSizeThreshold: 65536
+  aimp:BulkUpsertSizeLimitMb: 200
+
+  aimp:QueryExecutorQualifier: QueryExecutor
+  aimp:CommandControllerQualifier: CommandController
+  aimp:IndexRefresherQualifier: IndexRefresher
+  aimp:RequestControllerQualifier: RequestController
+  aimp:QueryControllerQualifier: QueryController
+
+  aimp:FsTempPath: /tmp
+  aimp:MaxNumComputeNodesStd: 2
+  aimp:MaxNumComputeNodesIa: 2
+  aimp:DesiredMemoryToStorageRatioStd: 0.5
+  aimp:DesiredMemoryToStorageRatioIa: 0.1
+  aimp:MemorySizePerComputeNodeStd: 10240
+  aimp:MemorySizePerComputeNodeIa: 10240
+  aimp:DesiredLambdaConcurrency: 0
+
+  #######################################
+  ##### BATCH Configuration ############
+  #######################################
+  aimp:IndexBuilderTimeout: 604800
+  aimp:IndexBuildInterval: 60
+  aimp:IndexBuilderRetryAttempts: 2
+  aimp:IndexBuilderStorageSizeGB: 21
+  aimp:IndexBuilderMaxComputeVcpus: 160
+  aimp:IndexBuilderVcpu: 8
+  aimp:IndexBuilderMemorySizeMB: 16384 # 16GB
+  aimp:IndexBuilderJobNamePrefix: IndexBuild
+  aimp:IndexBuilderConcurrency: 4
+  aimp:IndexBuilderLocalPath: ../../build/libs/indexBuilder
+  aimp:IndexBuilderDockerFilePath: ../../Dockerfile
+
+  #######################################
+  ##### Deployment Configuration ########
+  #######################################
+
+  aimp:LayerLocalPath: ../../build/function.zip
+  aimp:LayerS3Key: layer.zip
+  aimp:FunctionLocalPath: ../../function.zip
+  aimp:TotalQueryExecutorNumbers: 2
+
+  #######################################
+  ###### S3 Bucket Configuration ########
+  #######################################
+
+  # one of the following: private, public-read, public-read-write
+  aimp:S3Acl: private
+  aimp:S3TempBucketLifecycleRuleInDays: 14
+
+  #######################################
+  ###### DynamoDB Configuration ########
+  #######################################
+  aimp:DynamoDBDefaultBillingMode: pay_per_request
+
+  #######################################
+  ###### SQS Configuration ##############
+  #######################################
+  aimp:SQSVisibilityTimeoutSeconds: 2400
+
+  #######################################
+  ###### Scheduler Configuration ########
+  #######################################
+  aimp:SchedulerMaximumEventAgeInSeconds: 21600
+  aimp:SchedulerMaximumRetryAttempts: 2
