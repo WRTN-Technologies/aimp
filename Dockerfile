@@ -1,5 +1,5 @@
 FROM amazoncorretto:21
 
 WORKDIR /workspace
-COPY aimp.jar /workspace/aimp.jar
+COPY layer/build/libs/layer.jar /workspace/aimp.jar
 

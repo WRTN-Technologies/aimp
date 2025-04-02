@@ -42,13 +42,6 @@ from config import (
     INDEX_BUILDER_MAX_COMPUTE_VCPUS,
     INDEX_REFRESHER_QUALIFIER,
     API_VERSION,
-    SLACK_ALERT_ENABLED,
-    SLACK_ALERT_WEBHOOK_TOKEN,
-    SLACK_ALERT_CHANNEL_ID,
-    ALERTER_ZIP_FILE,
-    ALERTER_S3_KEY,
-    ALERTER_HASH_FILE,
-    ALERTER_BUILDER_PATH,
     AWS_ACCOUNT_ID,
 )
 
@@ -65,7 +58,6 @@ from variables import (
     QUERY_EXECUTOR_POLICY_NAME,
     INDEX_BUILDER_ROLE_NAME,
     INDEX_BUILDER_POLICY_NAME,
-    ALERTER_ROLE_NAME,
     BILLING_MODE,
     DELETION_PROTECTION,
     PROJECT_HASH_KEY,
@@ -115,8 +107,6 @@ from variables import (
     COMMAND_CONTROLLER_NAME,
     COMMAND_CONTROLLER_ALIAS_NAME,
     COMMAND_CONTROLLER_LOG_GROUP_NAME,
-    ALERTER_NAME,
-    ALERTER_LOG_GROUP_NAME,
     DEFAULT_STORAGE_CONFIG,
     LAMBDA_RUNTIME_CONFIG,
     LOG_CONFIG,
@@ -142,13 +132,10 @@ from variables import (
     INDEX_BUILDER_COMPUTE_ENVIRONMENT_NAME,
     INDEX_BUILDER_SPOT_COMPUTE_ENVIRONMENT_NAME,
     BATCH_ENVIRONMENT_CONFIG,
-    API_GATEWAY_STAGE_NAME,
     API_GATEWAY_NAME,
     API_GATEWAY_NAME_PRIVATE,
     API_GATEWAY_LOG_GROUP_NAME,
     API_GATEWAY_ENDPOINT_NAME,
-    API_GATEWAY_DEV_ENDPOINT_NAME,
-    API_GATEWAY_PROD_ENDPOINT_NAME,
     EFS_NAME,
     EFS_MOUNT_TARGET_NAME0,
     EFS_MOUNT_TARGET_NAME1,
@@ -166,14 +153,10 @@ from variables import (
     ADMIN_API_KEY_NAME,
     ADMIN_USAGE_PLAN_NAME,
     ADMIN_USAGE_PLAN_KEY_NAME,
-    API_GATEWAY_DEPLOYMENT_NAME,
     ROUTES,
     QUERY_ROUTES,
     LAMBDA_ARM_ARCHITECTURE,
-    LAMBDA_X86_ARCHITECTURE,
-    BATCH_ARM_ARCHITECTURE,
     BATCH_X86_ARCHITECTURE,
-    ALERTER_OBJECT_NAME,
 )
 
 class PruneLayerVersionsProvider(pulumi.dynamic.ResourceProvider):
@@ -223,7 +206,6 @@ class PruneLayerVersions(pulumi.dynamic.Resource):
             opts,
         )
 
-
 def query_executor(id, index_class):
     id = str(id)
     executor_name = ""
@@ -252,20 +234,27 @@ def query_executor(id, index_class):
         name=f"{executor_name}-{id}",
         code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
         role=query_executor_role.arn,
-        handler=DEFAULT_LAMBDA_HANDLER,
+        handler="lambda.QueryExecutor::handleRequest",
         runtime=LAMBDA_RUNTIME_CONFIG,
         architectures=[LAMBDA_ARM_ARCHITECTURE],
         memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
         ephemeral_storage=DEFAULT_STORAGE_CONFIG,
         timeout=DEFAULT_LAMBDA_TIMEOUT,
         environment=get_lambda_environment_config(QUERY_EXECUTOR_QUALIFIER),
+        vpc_config=aws.lambda_.FunctionVpcConfigArgs(
+            security_group_ids=[VPC_SECURITY_GROUP_ID],
+            subnet_ids=[
+                VPC_PRIVATE_SUBNET_ID0,
+                VPC_PRIVATE_SUBNET_ID1,
+                VPC_PRIVATE_SUBNET_ID2,
+            ],
+        ),
         layers=[
             lambda_layer.arn,
             LAMBDA_INSIGHTS_EXTENSION_ARM,
         ],
         logging_config=LOG_CONFIG,
         publish=True,
-        # tracing_config=TRACING_CONFIG,
         source_code_hash=std.filebase64sha256(FUNCTION_LOCAL_PATH).result,
         opts=pulumi.ResourceOptions(
             depends_on=[
@@ -285,7 +274,6 @@ def query_executor(id, index_class):
             depends_on=[executor],
         ),
     )
-
 
 def get_lambda_environment_config(lambda_qualifier):
     if lambda_qualifier == QUERY_EXECUTOR_QUALIFIER:
@@ -1615,7 +1603,6 @@ efs_access_point = aws.efs.AccessPoint(
     ),
 )
 
-# Lambda Layer
 prune_layer = PruneLayerVersions(
     PRUNE_LAYER_NAME,
     LAYER_NAME,
@@ -1664,7 +1651,7 @@ command_controller = aws.lambda_.Function(
     name=COMMAND_CONTROLLER_NAME,
     code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
     role=command_controller_role.arn,
-    handler=DEFAULT_LAMBDA_HANDLER,
+    handler="lambda.CommandController::handleRequest",
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
@@ -1724,7 +1711,7 @@ index_refresher = aws.lambda_.Function(
     name=f"{INDEX_REFRESHER_NAME}",
     code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
     role=index_refresher_role.arn,
-    handler=DEFAULT_LAMBDA_HANDLER,
+    handler="lambda.IndexRefresher::handleRequest",
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
@@ -1789,7 +1776,7 @@ request_controller = aws.lambda_.Function(
     name=f"{REQUEST_CONTROLLER_NAME}",
     code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
     role=request_controller_role.arn,
-    handler=DEFAULT_LAMBDA_HANDLER,
+    handler="lambda.RequestController::handleRequest",
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
@@ -1848,7 +1835,7 @@ query_controller = aws.lambda_.Function(
     name=f"{QUERY_CONTROLLER_NAME}",
     code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
     role=query_controller_role.arn,
-    handler=DEFAULT_LAMBDA_HANDLER,
+    handler="lambda.QueryController::handleRequest",
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,

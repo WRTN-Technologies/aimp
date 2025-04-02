@@ -72,9 +72,9 @@ config:
   ##### Deployment Configuration ########
   #######################################
 
-  aimp:LayerLocalPath: ../../build/function.zip
+  aimp:LayerLocalPath: ../../layer/layer.zip
   aimp:LayerS3Key: layer.zip
-  aimp:FunctionLocalPath: ../../function.zip
+  aimp:FunctionLocalPath: ../../build/libs/aimp.jar
   aimp:TotalQueryExecutorNumbers: 2
 
   #######################################
