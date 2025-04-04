@@ -3,11 +3,8 @@ import pulumi_aws as aws
 import pulumi_docker_build as docker_build
 import pulumi_std as std
 import json
-import os
 import boto3
 import pulumi_aws_apigateway as apigateway
-import subprocess
-import hashlib
 
 from config import (
     ENV,
