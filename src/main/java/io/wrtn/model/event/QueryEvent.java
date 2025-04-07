@@ -1,19 +1,8 @@
 package io.wrtn.model.event;
 
-import static io.wrtn.util.JsonParser.gson;
-
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.gson.JsonArray;
 import io.wrtn.model.index.FieldConfig;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import com.google.gson.JsonObject;
@@ -26,11 +15,7 @@ public class QueryEvent {
     private String indexClass;
     private Integer shardId;
     private Map<String, FieldConfig> mappings;
-    @JsonSerialize(using = JsonObjectSerializer.class)
-    @JsonDeserialize(using = JsonObjectDeserializer.class)
     JsonObject query;
-    @JsonSerialize(using = JsonArraySerializer.class)
-    @JsonDeserialize(using = JsonArrayDeserializer.class)
     JsonArray sort;
     private String[] fields;
     private boolean trackScores;
@@ -43,6 +28,7 @@ public class QueryEvent {
 
     public QueryEvent() {
         this.query = new JsonObject();
+        this.sort = new JsonArray();
     }
 
     public String getProjectId() {
@@ -98,7 +84,9 @@ public class QueryEvent {
     }
 
     public void setSort(JsonArray sort) {
-        this.sort = sort;
+        if (sort != null) {
+            this.sort = sort;
+        }
     }
 
     public String[] getFields() {
@@ -175,46 +163,6 @@ public class QueryEvent {
 
     public void setMetaObjectVersionId(String metaObjectVersionId) {
         this.metaObjectVersionId = metaObjectVersionId;
-    }
-
-    // Serializer
-    public static class JsonObjectSerializer extends JsonSerializer<JsonObject> {
-
-        @Override
-        public void serialize(JsonObject value, JsonGenerator gen, SerializerProvider provider)
-            throws IOException {
-            gen.writeRawValue(value.toString());
-        }
-    }
-
-    // Deserializer
-    public static class JsonObjectDeserializer extends JsonDeserializer<JsonObject> {
-
-        @Override
-        public JsonObject deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException {
-            return gson.fromJson(p.readValueAsTree().toString(), JsonObject.class);
-        }
-    }
-
-    // Serializer
-    public static class JsonArraySerializer extends JsonSerializer<JsonArray> {
-
-        @Override
-        public void serialize(JsonArray value, JsonGenerator gen, SerializerProvider provider)
-            throws IOException {
-            gen.writeRawValue(value.toString());
-        }
-    }
-
-    // Deserializer
-    public static class JsonArrayDeserializer extends JsonDeserializer<JsonArray> {
-
-        @Override
-        public JsonArray deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException {
-            return gson.fromJson(p.readValueAsTree().toString(), JsonArray.class);
-        }
     }
 
     @Override

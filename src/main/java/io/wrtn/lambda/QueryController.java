@@ -48,13 +48,11 @@ public class QueryController implements
     public APIGatewayProxyResponseEvent handleRequest(
         APIGatewayProxyRequestEvent httpRequest, Context context) {
 
-        if (httpRequest.getRequestContext() == null) {
-            return null;
-        }
-
         APIGatewayProxyResponseEvent httpResponse = new APIGatewayProxyResponseEvent();
 
         try {
+            GlobalLogger.initialize(false);
+
             setCommonResponseHeaders(httpResponse);
             httpResponse.setStatusCode(StatusCode.SUCCESS.getStatusCode());
 

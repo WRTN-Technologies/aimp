@@ -2,12 +2,10 @@ import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCach
 
 plugins {
     id 'java'
-    id 'io.quarkus' version "3.13.2"
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group 'io.wrtn'
-version '1.0.0'
 
 java {
     toolchain {
@@ -18,51 +16,63 @@ java {
 repositories {
     mavenCentral()
     mavenLocal()
-    // Maven Central Snapshots
-    maven {
-        url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    }
+}
+
+configurations {
+    shadowLog4j
+    implementation.extendsFrom(shadowLog4j)
 }
 
 dependencies {
-    compileOnly("org.apache.lucene:lucene-core:10.1.0")
-    compileOnly("org.apache.lucene:lucene-backward-codecs:10.1.0")
-    compileOnly('org.apache.lucene:lucene-analysis-nori:10.1.0')
-    compileOnly('org.apache.lucene:lucene-analysis-kuromoji:10.1.0')
-    compileOnly('org.apache.lucene:lucene-queryparser:10.1.0')
+    implementation("org.apache.lucene:lucene-core:10.1.0")
+    implementation("org.apache.lucene:lucene-backward-codecs:10.1.0")
+    implementation('org.apache.lucene:lucene-analysis-nori:10.1.0')
+    implementation('org.apache.lucene:lucene-analysis-kuromoji:10.1.0')
+    implementation('org.apache.lucene:lucene-queryparser:10.1.0')
 
-    compileOnly(platform('software.amazon.awssdk:bom:2.29.24'))
-    compileOnly('software.amazon.awssdk:dynamodb')
-    compileOnly('software.amazon.awssdk:dynamodb-enhanced')
-    compileOnly("software.amazon.awssdk:secretsmanager")
-    compileOnly("software.amazon.awssdk:s3")
-    compileOnly("software.amazon.awssdk:aws-crt-client")
-    compileOnly("software.amazon.awssdk:sqs")
-    compileOnly("software.amazon.awssdk:lambda")
-    compileOnly("software.amazon.awssdk:batch")
-    compileOnly("software.amazon.awssdk:apigateway")
+    implementation(platform('software.amazon.awssdk:bom:2.29.24'))
+    implementation('software.amazon.awssdk:dynamodb')
+    implementation('software.amazon.awssdk:dynamodb-enhanced')
+    implementation("software.amazon.awssdk:secretsmanager")
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:aws-crt-client")
+    implementation("software.amazon.awssdk:sqs")
+    implementation("software.amazon.awssdk:lambda")
+    implementation("software.amazon.awssdk:batch")
+    implementation("software.amazon.awssdk:apigateway")
 
-    compileOnly('com.amazonaws:aws-lambda-java-core:1.2.2')
-    compileOnly('com.amazonaws:aws-lambda-java-events:3.11.1')
+    implementation('com.amazonaws:aws-lambda-java-core:1.2.2')
+    implementation('com.amazonaws:aws-lambda-java-events:3.11.1')
 
-    compileOnly("com.beust:jcommander:1.81")
-    compileOnly("commons-io:commons-io:2.17.0")
-    compileOnly("org.apache.commons:commons-text:1.11.0")
-    compileOnly("org.apache.commons:commons-lang3:3.14.0")
-    compileOnly('com.google.code.gson:gson:2.10.1')
-    compileOnly("commons-codec:commons-codec:1.17.2")
+    implementation("com.beust:jcommander:1.81")
+    implementation("commons-io:commons-io:2.17.0")
+    implementation("org.apache.commons:commons-text:1.11.0")
+    implementation("org.apache.commons:commons-lang3:3.14.0")
+    implementation('com.google.code.gson:gson:2.10.1')
+    implementation("commons-codec:commons-codec:1.17.2")
 
-    compileOnly("com.fasterxml.jackson.core:jackson-core:2.18.3")
-    compileOnly("com.fasterxml.jackson.core:jackson-databind:2.18.3")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.18.3")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
 
-    compileOnly("org.jboss.logging:jboss-logging:3.6.1.Final")
-    compileOnly("org.jboss.logmanager:jboss-logmanager:3.1.2.Final")
+    implementation("org.jboss.logging:jboss-logging:3.6.1.Final")
+    implementation("org.jboss.logmanager:jboss-logmanager:3.1.2.Final")
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("org.slf4j:slf4j-simple:2.0.17")
 
     configurations.configureEach {
         exclude group: 'software.amazon.awssdk', module: 'netty-nio-client'
         exclude group: 'software.amazon.awssdk', module: 'apache-client'
     }
 }
+
+task buildZip(type: Zip) {
+    into('lib') {
+        from(jar)
+        from(configurations.runtimeClasspath)
+    }
+}
+
+build.dependsOn buildZip
 
 shadowJar {
     mergeServiceFiles()
@@ -73,4 +83,10 @@ shadowJar {
     manifest.attributes(
             'Multi-Release': 'true'
     )
+    destinationDirectory.set(file("build/libs/indexBuilder"))
+    configurations = [project.configurations.shadowLog4j]
+    from(sourceSets.main.output)
+    configurations += [project.configurations.runtimeClasspath]
+    exclude('META-INF/ide-deps/**')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

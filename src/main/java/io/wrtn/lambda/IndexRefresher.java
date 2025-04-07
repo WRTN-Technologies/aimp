@@ -3,6 +3,7 @@ package io.wrtn.lambda;
 import static io.wrtn.util.Constants.CommandType.DOCUMENT_FETCH;
 import static io.wrtn.util.Constants.CommandType.DOCUMENT_QUERY;
 import static io.wrtn.util.JsonParser.exceptionGson;
+import static io.wrtn.util.JsonParser.gson;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
@@ -21,7 +22,7 @@ import io.wrtn.util.GlobalExceptionHandler;
 import io.wrtn.util.StatusCode;
 
 public class IndexRefresher implements
-    RequestHandler<RefreshEvent, RefreshedDocs> {
+    RequestHandler<Map<String, Object>, String> {
 
     private static final Map<String, IndexRefreshHelper> helperMap = new HashMap<>();
 
@@ -36,10 +37,13 @@ public class IndexRefresher implements
     }
 
     @Override
-    public RefreshedDocs handleRequest(
-        RefreshEvent event,
+    public String handleRequest(
+        Map<String, Object> eventMap,
         Context context
     ) {
+
+        GlobalLogger.initialize(false);
+        RefreshEvent event = gson.fromJson(gson.toJson(eventMap), RefreshEvent.class);
         try {
             long start = System.currentTimeMillis();
 
@@ -80,7 +84,7 @@ public class IndexRefresher implements
                 GlobalLogger.info("Request: " + event);
             }
 
-            return docs;
+            return gson.toJson(docs);
 
         } catch (GlobalExceptionHandler ge) {
             GlobalLogger.error("Exception: " + ge);

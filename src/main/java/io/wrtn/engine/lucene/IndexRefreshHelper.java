@@ -279,7 +279,7 @@ public class IndexRefreshHelper {
         TopDocs topDocs;
         Query query;
         List<Document> docs;
-        if (sortArray == null) {
+        if (sortArray == null || sortArray.isEmpty()) {
             query = SearchQueryBuilder.build(jsonQuery, index.getMappings());
             topDocs = searcher.search(query, size);
             docs = DocUtils.fetchDocuments(topDocs, includeVectors, true, fields,

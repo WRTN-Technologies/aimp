@@ -51,7 +51,6 @@ config:
   aimp:DesiredMemoryToStorageRatioIa: 0.1
   aimp:MemorySizePerComputeNodeStd: 10240
   aimp:MemorySizePerComputeNodeIa: 10240
-  aimp:DesiredLambdaConcurrency: 0
 
   #######################################
   ##### BATCH Configuration ############
@@ -71,11 +70,8 @@ config:
   #######################################
   ##### Deployment Configuration ########
   #######################################
-
-  aimp:LayerLocalPath: ../../layer/layer.zip
-  aimp:LayerS3Key: layer.zip
-  aimp:FunctionLocalPath: ../../build/libs/aimp.jar
-  aimp:TotalQueryExecutorNumbers: 2
+  aimp:FunctionLocalPath: ../../build/distributions/aimp.zip
+  aimp:FunctionS3Key: aimp.zip
 
   #######################################
   ###### S3 Bucket Configuration ########

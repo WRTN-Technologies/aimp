@@ -65,6 +65,8 @@ public class CommandController implements RequestHandler<SQSEvent, Void> {
     public Void handleRequest(SQSEvent event, Context context) {
 
         try {
+            GlobalLogger.initialize(false);
+
             List<ControlCommand> controlCommands = new ArrayList<>();
             // Get control commands from SQS messages
             for (SQSEvent.SQSMessage msg : event.getRecords()) {

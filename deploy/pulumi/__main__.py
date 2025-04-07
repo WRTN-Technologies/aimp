@@ -3,7 +3,6 @@ import pulumi_aws as aws
 import pulumi_docker_build as docker_build
 import pulumi_std as std
 import json
-import boto3
 import pulumi_aws_apigateway as apigateway
 
 from config import (
@@ -24,8 +23,6 @@ from config import (
     SCHEDULER_MAXIMUM_EVENT_AGE_IN_SECONDS,
     SCHEDULER_MAXIMUM_RETRY_ATTEMPTS,
     SQS_VISIBILITY_TIMEOUT_SECONDS,
-    LAYER_LOCAL_PATH,
-    LAYER_S3_KEY,
     LOG_RETENTION_IN_DAYS,
     DEFAULT_LAMBDA_MEMORY_SIZE_MB,
     DEFAULT_LAMBDA_TIMEOUT,
@@ -40,6 +37,7 @@ from config import (
     INDEX_REFRESHER_QUALIFIER,
     API_VERSION,
     AWS_ACCOUNT_ID,
+    FUNCTION_S3_KEY
 )
 
 from variables import (
@@ -84,7 +82,6 @@ from variables import (
     CONTROL_QUEUE_NAME,
     INDEX_BUILD_SCHEDULE_NAME,
     INDEX_RESCHED_SCHEDULE_NAME,
-    LAMBDA_WARMUP_SCHEDULE_NAME,
     SCHEDULE_GROUP_NAME,
     FLEXIBLE_TIME_WINDOW_OFF_MODE,
     DEFAULT_SCHEDULE_EXPRESSION,
@@ -107,16 +104,12 @@ from variables import (
     DEFAULT_STORAGE_CONFIG,
     LAMBDA_RUNTIME_CONFIG,
     LOG_CONFIG,
-    # TRACING_CONFIG,
     QUERY_EXECUTOR_NAME_STD,
     QUERY_EXECUTOR_NAME_IA,
     QUERY_EXECUTOR_ALIAS_NAME_STD,
     QUERY_EXECUTOR_ALIAS_NAME_IA,
     QUERY_EXECUTOR_LOG_GROUP_NAME_STD,
     QUERY_EXECUTOR_LOG_GROUP_NAME_IA,
-    LAYER_NAME,
-    PRUNE_LAYER_NAME,
-    LAYER_OBJECT_NAME,
     INDEX_BUILDER_JOB_DEFINITION_NAME,
     INDEX_BUILDER_TIMEOUT,
     INDEX_BUILDER_JOB_QUEUE_NAME,
@@ -127,7 +120,6 @@ from variables import (
     INDEX_BUILDER_LOG_GROUP_NAME,
     INDEX_BUILDER_NAME,
     INDEX_BUILDER_COMPUTE_ENVIRONMENT_NAME,
-    INDEX_BUILDER_SPOT_COMPUTE_ENVIRONMENT_NAME,
     BATCH_ENVIRONMENT_CONFIG,
     API_GATEWAY_NAME,
     API_GATEWAY_NAME_PRIVATE,
@@ -140,8 +132,6 @@ from variables import (
     EFS_ACCESS_POINT_NAME,
     EFS_ROOT_PATH,
     EFS_MOUNT_PATH,
-    DEFAULT_LAMBDA_HANDLER,
-    LAMBDA_INSIGHTS_EXTENSION_ARM,
     QUERY_EXECUTOR_ENV,
     INDEX_REFRESHER_ENV,
     COMMAND_CONTROLLER_ENV,
@@ -154,54 +144,8 @@ from variables import (
     QUERY_ROUTES,
     LAMBDA_ARM_ARCHITECTURE,
     BATCH_X86_ARCHITECTURE,
+    FUNCTION_OBJECT_NAME,
 )
-
-class PruneLayerVersionsProvider(pulumi.dynamic.ResourceProvider):
-    def __init__(self, layer_name):
-        super().__init__()
-        self.layer_name = layer_name
-
-    def delete_old_versions(self, layer_arn):
-        client = boto3.client("lambda")
-
-        response = client.list_layer_versions(LayerName=layer_arn)
-
-        versions = sorted(
-            response["LayerVersions"], key=lambda x: x["CreatedDate"], reverse=True
-        )
-
-        # Only keep the latest 3 versions
-        if len(versions) > 3:
-            versions_to_delete = versions[3:]
-
-            for version in versions_to_delete:
-                client.delete_layer_version(
-                    LayerName=layer_arn, VersionNumber=version["Version"]
-                )
-
-    def create(self, inputs):
-        layer_name = inputs["layer_name"]
-        self.delete_old_versions(layer_name)
-        return pulumi.dynamic.CreateResult(
-            id_="prune-lambda-layers", outs={"layer_name": layer_name}
-        )
-
-    def update(self, _id, _olds, _news):
-        layer_name = _news["layer_name"]
-        self.delete_old_versions(layer_name)
-        return pulumi.dynamic.UpdateResult(outs={"layer_name": layer_name})
-
-
-class PruneLayerVersions(pulumi.dynamic.Resource):
-    def __init__(self, name, layer_name, opts=None):
-        super().__init__(
-            PruneLayerVersionsProvider(layer_name),
-            name,
-            {
-                "layer_name": layer_name,
-            },
-            opts,
-        )
 
 def query_executor(id, index_class):
     id = str(id)
@@ -221,17 +165,16 @@ def query_executor(id, index_class):
         f"{log_group_name}-{id}",
         name=f"/aws/lambda/{executor_name}-{id}",
         retention_in_days=LOG_RETENTION_IN_DAYS,
-        opts=pulumi.ResourceOptions(
-            depends_on=[lambda_layer],
-        ),
     )
 
     executor = aws.lambda_.Function(
         f"{executor_name}-{id}",
         name=f"{executor_name}-{id}",
-        code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
+        s3_bucket=s3_bucket.id,
+        s3_key=function_object.key,
         role=query_executor_role.arn,
-        handler="lambda.QueryExecutor::handleRequest",
+        handler="io.wrtn.lambda.QueryExecutor::handleRequest",
+        source_code_hash=function_object.source_hash,
         runtime=LAMBDA_RUNTIME_CONFIG,
         architectures=[LAMBDA_ARM_ARCHITECTURE],
         memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
@@ -246,18 +189,13 @@ def query_executor(id, index_class):
                 VPC_PRIVATE_SUBNET_ID2,
             ],
         ),
-        layers=[
-            lambda_layer.arn,
-            LAMBDA_INSIGHTS_EXTENSION_ARM,
-        ],
         logging_config=LOG_CONFIG,
         publish=True,
-        source_code_hash=std.filebase64sha256(FUNCTION_LOCAL_PATH).result,
         opts=pulumi.ResourceOptions(
             depends_on=[
                 log_group,
                 query_executor_role,
-                lambda_layer,
+                function_object
             ],
         ),
     )
@@ -1600,39 +1538,13 @@ efs_access_point = aws.efs.AccessPoint(
     ),
 )
 
-prune_layer = PruneLayerVersions(
-    PRUNE_LAYER_NAME,
-    LAYER_NAME,
-    opts=pulumi.ResourceOptions(
-        depends_on=[s3_bucket],
-    ),
-)
-
 # Upload the Lambda layer zip to the S3 bucket
-layer_object = aws.s3.BucketObject(
-    LAYER_OBJECT_NAME,
+function_object = aws.s3.BucketObject(
+    FUNCTION_OBJECT_NAME,
     bucket=s3_bucket.id,
-    source=pulumi.FileAsset(LAYER_LOCAL_PATH),
-    key=LAYER_S3_KEY,
-    opts=pulumi.ResourceOptions(
-        depends_on=[prune_layer],
-    ),
-    source_hash=std.filebase64sha256(LAYER_LOCAL_PATH).result,
-)
-
-# Define the Lambda Layer
-lambda_layer = aws.lambda_.LayerVersion(
-    LAYER_NAME,
-    layer_name=LAYER_NAME,
-    description=LAYER_NAME,
-    s3_bucket=s3_bucket.bucket,
-    s3_key=layer_object.key,
-    compatible_runtimes=[LAMBDA_RUNTIME_CONFIG],
-    compatible_architectures=[LAMBDA_ARM_ARCHITECTURE],
-    opts=pulumi.ResourceOptions(
-        depends_on=[layer_object],
-    ),
-    source_code_hash=std.filebase64sha256(LAYER_LOCAL_PATH).result,
+    source=pulumi.FileAsset(FUNCTION_LOCAL_PATH),
+    key=FUNCTION_S3_KEY,
+    source_hash=std.filebase64sha256(FUNCTION_LOCAL_PATH).result,
 )
 
 # Lambda Functions
@@ -1640,15 +1552,16 @@ command_controller_log_group = aws.cloudwatch.LogGroup(
     COMMAND_CONTROLLER_LOG_GROUP_NAME,
     name=f"/aws/lambda/{COMMAND_CONTROLLER_NAME}",
     retention_in_days=LOG_RETENTION_IN_DAYS,
-    opts=pulumi.ResourceOptions(depends_on=[lambda_layer]),
 )
 
 command_controller = aws.lambda_.Function(
     COMMAND_CONTROLLER_NAME,
     name=COMMAND_CONTROLLER_NAME,
-    code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
     role=command_controller_role.arn,
-    handler="lambda.CommandController::handleRequest",
+    s3_bucket=s3_bucket.id,
+    s3_key=function_object.key,
+    handler="io.wrtn.lambda.CommandController::handleRequest",
+    source_code_hash=function_object.source_hash,
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
@@ -1663,14 +1576,8 @@ command_controller = aws.lambda_.Function(
             VPC_PRIVATE_SUBNET_ID2,
         ],
     ),
-    layers=[
-        lambda_layer.arn,
-        LAMBDA_INSIGHTS_EXTENSION_ARM,
-    ],
     logging_config=LOG_CONFIG,
     publish=True,
-    # tracing_config=TRACING_CONFIG,
-    source_code_hash=std.filebase64sha256(FUNCTION_LOCAL_PATH).result,
     file_system_config={
         "arn": efs_access_point.arn,
         "localMountPath": EFS_MOUNT_PATH,
@@ -1680,8 +1587,8 @@ command_controller = aws.lambda_.Function(
             command_controller_log_group,
             control_queue,
             command_controller_role,
-            lambda_layer,
             efs_access_point,
+            function_object
         ],
     ),
 )
@@ -1700,15 +1607,16 @@ index_refresher_log_group = aws.cloudwatch.LogGroup(
     INDEX_REFRESHER_LOG_GROUP_NAME,
     name=f"/aws/lambda/{INDEX_REFRESHER_NAME}",
     retention_in_days=LOG_RETENTION_IN_DAYS,
-    opts=pulumi.ResourceOptions(depends_on=[lambda_layer]),
 )
 
 index_refresher = aws.lambda_.Function(
     f"{INDEX_REFRESHER_NAME}",
     name=f"{INDEX_REFRESHER_NAME}",
-    code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
+    s3_bucket=s3_bucket.id,
+    s3_key=function_object.key,
     role=index_refresher_role.arn,
-    handler="lambda.IndexRefresher::handleRequest",
+    handler="io.wrtn.lambda.IndexRefresher::handleRequest",
+    source_code_hash=function_object.source_hash,
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
@@ -1723,14 +1631,8 @@ index_refresher = aws.lambda_.Function(
             VPC_PRIVATE_SUBNET_ID2,
         ],
     ),
-    layers=[
-        lambda_layer.arn,
-        LAMBDA_INSIGHTS_EXTENSION_ARM,
-    ],
     logging_config=LOG_CONFIG,
     publish=True,
-    # tracing_config=TRACING_CONFIG,
-    source_code_hash=std.filebase64sha256(FUNCTION_LOCAL_PATH).result,
     file_system_config={
         "arn": efs_access_point.arn,
         "localMountPath": EFS_MOUNT_PATH,
@@ -1739,8 +1641,8 @@ index_refresher = aws.lambda_.Function(
         depends_on=[
             index_refresher_log_group,
             index_refresher_role,
-            lambda_layer,
             efs_access_point,
+            function_object,
         ],
     ),
 )
@@ -1765,15 +1667,16 @@ request_controller_log_group = aws.cloudwatch.LogGroup(
     REQUEST_CONTROLLER_LOG_GROUP_NAME,
     name=f"/aws/lambda/{REQUEST_CONTROLLER_NAME}",
     retention_in_days=LOG_RETENTION_IN_DAYS,
-    opts=pulumi.ResourceOptions(depends_on=[lambda_layer]),
 )
 
 request_controller = aws.lambda_.Function(
     f"{REQUEST_CONTROLLER_NAME}",
     name=f"{REQUEST_CONTROLLER_NAME}",
-    code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
+    s3_bucket=s3_bucket.id,
+    s3_key=function_object.key,
     role=request_controller_role.arn,
-    handler="lambda.RequestController::handleRequest",
+    handler="io.wrtn.lambda.RequestController::handleRequest",
+    source_code_hash=function_object.source_hash,
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
@@ -1788,24 +1691,17 @@ request_controller = aws.lambda_.Function(
             VPC_PRIVATE_SUBNET_ID2,
         ],
     ),
-    layers=[
-        lambda_layer.arn,
-        LAMBDA_INSIGHTS_EXTENSION_ARM,
-    ],
     logging_config=LOG_CONFIG,
     publish=True,
-    # tracing_config=TRACING_CONFIG,
-    source_code_hash=std.filebase64sha256(FUNCTION_LOCAL_PATH).result,
     file_system_config={
         "arn": efs_access_point.arn,
         "localMountPath": EFS_MOUNT_PATH,
     },
-    # reserved_concurrent_executions=200,
     opts=pulumi.ResourceOptions(
         depends_on=[
             request_controller_log_group,
             request_controller_role,
-            lambda_layer,
+            function_object
         ],
     ),
 )
@@ -1824,35 +1720,29 @@ query_controller_log_group = aws.cloudwatch.LogGroup(
     QUERY_CONTROLLER_LOG_GROUP_NAME,
     name=f"/aws/lambda/{QUERY_CONTROLLER_NAME}",
     retention_in_days=LOG_RETENTION_IN_DAYS,
-    opts=pulumi.ResourceOptions(depends_on=[lambda_layer]),
 )
 
 query_controller = aws.lambda_.Function(
     f"{QUERY_CONTROLLER_NAME}",
     name=f"{QUERY_CONTROLLER_NAME}",
-    code=pulumi.FileArchive(FUNCTION_LOCAL_PATH),
+    s3_bucket=s3_bucket.id,
+    s3_key=function_object.key,
     role=query_controller_role.arn,
-    handler="lambda.QueryController::handleRequest",
+    handler="io.wrtn.lambda.QueryController::handleRequest",
+    source_code_hash=function_object.source_hash,
     runtime=LAMBDA_RUNTIME_CONFIG,
     architectures=[LAMBDA_ARM_ARCHITECTURE],
     memory_size=DEFAULT_LAMBDA_MEMORY_SIZE_MB,
     ephemeral_storage=DEFAULT_STORAGE_CONFIG,
     timeout=DEFAULT_LAMBDA_TIMEOUT,
     environment=get_lambda_environment_config(QUERY_CONTROLLER_QUALIFIER),
-    layers=[
-        lambda_layer.arn,
-        LAMBDA_INSIGHTS_EXTENSION_ARM,
-    ],
     logging_config=LOG_CONFIG,
     publish=True,
-    # tracing_config=TRACING_CONFIG,
-    source_code_hash=std.filebase64sha256(FUNCTION_LOCAL_PATH).result,
-    reserved_concurrent_executions=200,
     opts=pulumi.ResourceOptions(
         depends_on=[
             query_controller_log_group,
             query_controller_role,
-            lambda_layer,
+            function_object
         ],
     ),
 )
@@ -1928,34 +1818,6 @@ index_resched_schedule = aws.scheduler.Schedule(
             maximum_retry_attempts=SCHEDULER_MAXIMUM_RETRY_ATTEMPTS,
         ),
         input='{"type": "INDEX_RESCHED"}',
-    ),
-    opts=pulumi.ResourceOptions(
-        depends_on=[
-            schedule_group,
-            control_queue,
-            scheduler_role,
-            command_controller,
-            command_controller_alias,
-        ]
-    ),
-)
-
-lambda_warmup_schedule = aws.scheduler.Schedule(
-    LAMBDA_WARMUP_SCHEDULE_NAME,
-    name=LAMBDA_WARMUP_SCHEDULE_NAME,
-    group_name=schedule_group.name,
-    flexible_time_window=FLEXIBLE_TIME_WINDOW_OFF_MODE,
-    state="DISABLED",
-    # schedule_expression=FIVE_MIN_SCHEDULE_EXPRESSION,
-    schedule_expression=DEFAULT_SCHEDULE_EXPRESSION,
-    target=aws.scheduler.ScheduleTargetArgs(
-        arn=control_queue.arn,
-        role_arn=scheduler_role.arn,
-        retry_policy=aws.scheduler.ScheduleTargetRetryPolicyArgs(
-            maximum_event_age_in_seconds=SCHEDULER_MAXIMUM_EVENT_AGE_IN_SECONDS,
-            maximum_retry_attempts=SCHEDULER_MAXIMUM_RETRY_ATTEMPTS,
-        ),
-        input='{"type": "LAMBDA_WARMUP"}',
     ),
     opts=pulumi.ResourceOptions(
         depends_on=[
@@ -2127,28 +1989,6 @@ index_builder_log_group = aws.cloudwatch.LogGroup(
     ),
 )
 
-spot_compute_environment = aws.batch.ComputeEnvironment(
-    INDEX_BUILDER_SPOT_COMPUTE_ENVIRONMENT_NAME,
-    compute_environment_name=INDEX_BUILDER_SPOT_COMPUTE_ENVIRONMENT_NAME,
-    type="MANAGED",
-    service_role=index_builder_role.arn,
-    state="ENABLED",
-    compute_resources=aws.batch.ComputeEnvironmentComputeResourcesArgs(
-        max_vcpus=INDEX_BUILDER_MAX_COMPUTE_VCPUS,
-        security_group_ids=[VPC_SECURITY_GROUP_ID],
-        subnets=[
-            VPC_PRIVATE_SUBNET_ID0,
-            VPC_PRIVATE_SUBNET_ID1,
-            VPC_PRIVATE_SUBNET_ID2,
-        ],
-        type="FARGATE_SPOT",
-    ),
-    opts=pulumi.ResourceOptions(
-        parent=index_builder_policy,
-        depends_on=[index_builder_policy, index_builder_role],
-    ),
-)
-
 compute_environment = aws.batch.ComputeEnvironment(
     INDEX_BUILDER_COMPUTE_ENVIRONMENT_NAME,
     compute_environment_name=INDEX_BUILDER_COMPUTE_ENVIRONMENT_NAME,
@@ -2179,10 +2019,6 @@ index_builder_job_queue = aws.batch.JobQueue(
     compute_environment_orders=[
         aws.batch.JobQueueComputeEnvironmentOrderArgs(
             order=1,
-            compute_environment=spot_compute_environment.arn,
-        ),
-        aws.batch.JobQueueComputeEnvironmentOrderArgs(
-            order=2,
             compute_environment=compute_environment.arn,
         ),
     ],
@@ -2191,7 +2027,6 @@ index_builder_job_queue = aws.batch.JobQueue(
         depends_on=[
             index_builder_policy,
             index_builder_role,
-            spot_compute_environment,
             compute_environment,
         ],
     ),
