@@ -1,0 +1,45 @@
+# Created by https://www.toptal.com/developers/gitignore/api/intellij+all,java,sam+config
+# Edit at https://www.toptal.com/developers/gitignore?templates=intellij+all,java,sam+config
+
+### Intellij+all ###
+# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
+# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+
+test
+
+java/.gradle
+.DS_Store
+golang/.idea
+java/.idea
+
+java/build
+java/*.iml
+java/*.ipr
+java/out/
+**/*.class
+**/*.log
+**/*.jar
+**/*.war
+**/*.nar
+**/*.ear
+**/*.zip
+**/*.tar.gz
+**/*.rar
+**/.aws-sam
+**/MANIFEST.MF
+alert/package
+
+.idea
+.gradle
+/build/
+
+.env
+*.zip
+
+benchmark/output
+benchmark/data
+benchmark/node_modules
+benchmark/package-lock.json
+benchmark/package.json
+benchmark/**/__pycache__/
+.quarkus
