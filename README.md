@@ -33,7 +33,7 @@ pulumi stack init
 https://app.pulumi.com/account/tokens
 
 # Select your stack
-pulumi stack select dev
+pulumi stack select oss-test
 
 # Deploy your stack
 pulumi up
