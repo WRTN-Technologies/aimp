@@ -27,7 +27,6 @@ from config import (
     WAL_PAYLOAD_SIZE_THRESHOLD,
     DEFAULT_LAMBDA_TIMEOUT,
     BULK_UPSERT_SIZE_LIMIT_MB,
-    DESIRED_LAMBDA_CONCURRENCY,
     REQUEST_CONTROLLER_QUALIFIER,
     API_VERSION,
     MAX_NUM_COMPUTE_NODES_STD,
@@ -87,23 +86,8 @@ INDEX_REFRESHER_POLICY_NAME = f"{INDEX_REFRESHER_BASE_NAME}-policy-{ENV}"
 INDEX_REFRESHER_ALIAS_NAME = f"{INDEX_REFRESHER_BASE_NAME}-alias-{ENV}"
 INDEX_REFRESHER_LOG_GROUP_NAME = f"{INDEX_REFRESHER_BASE_NAME}-log-group-{ENV}"
 
-ALERTER_BASE_NAME = f"{DEFAULT_PREFIX}-alerter"
-ALERTER_NAME = f"{ALERTER_BASE_NAME}-{ENV}"
-ALERTER_ROLE_NAME = f"{ALERTER_BASE_NAME}-role-{ENV}"
-ALERTER_POLICY_NAME = f"{ALERTER_BASE_NAME}-policy-{ENV}"
-ALERTER_ALIAS_NAME = f"{ALERTER_BASE_NAME}-alias-{ENV}"
-ALERTER_LOG_GROUP_NAME = f"{ALERTER_BASE_NAME}-log-group-{ENV}"
-ALERTER_OBJECT_NAME = f"{ALERTER_BASE_NAME}-object-{ENV}"
-
-LAYER_BASE_NAME = f"{DEFAULT_PREFIX}-lambda-layer"
-LAYER_NAME = f"{LAYER_BASE_NAME}-{ENV}"
-LAYER_OBJECT_NAME = f"{LAYER_BASE_NAME}-object-{ENV}"
-PRUNE_LAYER_NAME = f"{LAYER_BASE_NAME}-prune-{ENV}"
-LAMBDA_RUNTIME_CONFIG = aws.lambda_.Runtime.CUSTOM_AL2023
-LAMBDA_INSIGHTS_EXTENSION_ARM = (
-    "arn:aws:lambda:ap-northeast-2:580247275435:layer:LambdaInsightsExtension-Arm64:19"
-)
-
+LAMBDA_RUNTIME_CONFIG = aws.lambda_.Runtime.JAVA21
+FUNCTION_OBJECT_NAME = f"{DEFAULT_PREFIX}-function-object-{ENV}"
 LAMBDA_ARM_ARCHITECTURE = "arm64"
 LAMBDA_X86_ARCHITECTURE = "x86_64"
 
@@ -204,12 +188,8 @@ S3_BUCKET_LIFECYCLE_RULE = [
     aws.s3.BucketLifecycleConfigurationV2RuleArgs(
         id=f"versioned-bucket-lifecycle-{ENV}",
         status="Enabled",
-        # noncurrent_version_expiration=aws.s3.BucketLifecycleConfigurationV2RuleNoncurrentVersionExpirationArgs(
-        #     noncurrent_days=S3_NONCURRENT_VERSION_EXPIRATION_IN_DAYS
-        # ),
         noncurrent_version_transitions=[
             aws.s3.BucketLifecycleConfigurationV2RuleNoncurrentVersionTransitionArgs(
-                # noncurrent_days=S3_NONCURRENT_VERSION_INTELLIGENT_TIERING_TRANSITION_IN_DAYS,
                 storage_class="INTELLIGENT_TIERING",
             )
         ],
@@ -246,7 +226,6 @@ CONTROL_QUEUE_EVENT_SOURCE_MAPPING_NAME = (
 SCHEDULER_BASE_NAME = f"{DEFAULT_PREFIX}"
 INDEX_BUILD_SCHEDULE_NAME = f"{SCHEDULER_BASE_NAME}-index-build-schedule-{ENV}"
 INDEX_RESCHED_SCHEDULE_NAME = f"{SCHEDULER_BASE_NAME}-index-resched-schedule-{ENV}"
-LAMBDA_WARMUP_SCHEDULE_NAME = f"{SCHEDULER_BASE_NAME}-lambda-warmup-schedule-{ENV}"
 SCHEDULE_GROUP_NAME = f"{SCHEDULER_BASE_NAME}-schedule-group-{ENV}"
 
 FLEXIBLE_TIME_WINDOW_OFF_MODE = aws.scheduler.ScheduleFlexibleTimeWindowArgs(mode="OFF")
@@ -269,9 +248,6 @@ INDEX_BUILDER_ECR_LIFE_CYCLE_POLICY_NAME = (
 )
 INDEX_BUILDER_ECR_IMAGE_NAME = f"{INDEX_BUILDER_BASE_NAME}-image-{ENV}"
 INDEX_BUILDER_LOG_GROUP_NAME = f"{INDEX_BUILDER_BASE_NAME}-log-group-{ENV}"
-INDEX_BUILDER_SPOT_COMPUTE_ENVIRONMENT_NAME = (
-    f"{INDEX_BUILDER_BASE_NAME}-spot-compute-{ENV}"
-)
 INDEX_BUILDER_COMPUTE_ENVIRONMENT_NAME = f"{INDEX_BUILDER_BASE_NAME}-compute-{ENV}"
 
 BATCH_ARM_ARCHITECTURE = "ARM64"
@@ -378,7 +354,6 @@ COMMAND_CONTROLLER_ENV = aws.lambda_.FunctionEnvironmentArgs(
         "DISABLE_SIGNAL_HANDLERS": "true",
         "QUARKUS_LAMBDA_HANDLER": COMMAND_CONTROLLER_QUALIFIER,
         "DEFAULT_LAMBDA_TIMEOUT": DEFAULT_LAMBDA_TIMEOUT,
-        "DESIRED_LAMBDA_CONCURRENCY": DESIRED_LAMBDA_CONCURRENCY,
         "REQUEST_CONTROLLER_NAME": REQUEST_CONTROLLER_NAME,
         "REQUEST_CONTROLLER_QUALIFIER": REQUEST_CONTROLLER_QUALIFIER,
         "PROJECT_API_KEY_PREFIX": PROJECT_API_KEY_PREFIX,
@@ -393,15 +368,7 @@ BATCH_ENVIRONMENT_CONFIG = [
     {
         "name": "JAVA_TOOL_OPTIONS",
         "value": (
-            "-XX:InitialRAMPercentage=50.0 "
-            "-XX:MaxRAMPercentage=50.0 "
-            "-XX:+TieredCompilation "
             "--enable-native-access=ALL-UNNAMED "
-            # "-XX:+UseG1GC "
-            "-XX:+UseZGC "
-            "-XX:+ZGenerational "
-            "-XX:-ZUncommit "
-            # "-XX:+UseLargePages -XX:+UseTransparentHugePages "
             "--add-modules=jdk.incubator.vector "
             "-Djava.util.logging.manager=org.jboss.logmanager.LogManager"
         ),

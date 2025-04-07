@@ -8,12 +8,17 @@ import io.wrtn.engine.lucene.QueryExecuteHelper;
 import io.wrtn.infra.aws.S3;
 import io.wrtn.model.event.QueryEvent;
 import io.wrtn.model.document.Document;
+import io.wrtn.model.storage.File;
 import io.wrtn.model.storage.StorageMetadata;
 import io.wrtn.util.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.lambda.model.LambdaException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -22,11 +27,14 @@ import static io.wrtn.infra.aws.Constants.S3.INDEX_BUCKET;
 import static io.wrtn.util.Constants.CommandType.DOCUMENT_FETCH;
 import static io.wrtn.util.Constants.CommandType.DOCUMENT_QUERY;
 
+import static io.wrtn.util.Constants.Config.FS_TEMP_PATH;
+import static io.wrtn.util.Constants.Config.TEMPORARY_SHARD_ID;
 import static io.wrtn.util.JsonParser.exceptionGson;
 import static io.wrtn.util.JsonParser.gson;
+import static org.apache.lucene.index.IndexFileNames.SEGMENTS;
 
 public class QueryExecutor implements
-    RequestHandler<QueryEvent, Document[]> {
+    RequestHandler<Map<String, Object>, String> {
 
     // TODO: Max QueryExecuteHelper instances to limit memory usage
     private static final Map<String, QueryExecuteHelper> helperMap = new HashMap<>();
@@ -37,10 +45,12 @@ public class QueryExecutor implements
     }
 
     @Override
-    public Document[] handleRequest(
-        QueryEvent queryEvent,
+    public String handleRequest(
+        Map<String, Object> queryEventMap,
         Context context
     ) {
+        GlobalLogger.initialize(false);
+        QueryEvent queryEvent = gson.fromJson(gson.toJson(queryEventMap), QueryEvent.class);
         try {
             long start = System.currentTimeMillis();
 
@@ -54,6 +64,19 @@ public class QueryExecutor implements
                 StorageMetadata meta = gson.fromJson(s3Client.getVersionedObject(INDEX_BUCKET,
                         queryEvent.getMetaObjectKey(), queryEvent.getMetaObjectVersionId())
                     .asUtf8String(), StorageMetadata.class);
+
+                // Write segments_N bytes to local disk
+                for (Entry<String, File> entry : meta.getFileMap().entrySet()) {
+                    String name = entry.getKey();
+                    if (name.contains(SEGMENTS)) {
+                        File segmentFile = entry.getValue();
+                        Path localPath = Paths.get(PathBuilder.buildFsCachePath(
+                            FS_TEMP_PATH, projectId, indexName, TEMPORARY_SHARD_ID) + name);
+                        Files.createDirectories(localPath.getParent());
+                        Files.write(localPath, segmentFile.getFullBytes());
+                        break;
+                    }
+                }
 
                 queryExecuteHelper = new QueryExecuteHelper(
                     projectId,
@@ -98,7 +121,7 @@ public class QueryExecutor implements
                 GlobalLogger.info("Request: " + queryEvent);
             }
 
-            return docs;
+            return gson.toJson(docs);
 
         } catch (GlobalExceptionHandler ge) {
             GlobalLogger.error("Exception: " + ge);
@@ -108,6 +131,7 @@ public class QueryExecutor implements
         } catch (S3Exception s3e) {
             GlobalLogger.error("Event: " + queryEvent);
             GlobalLogger.error(Arrays.toString(s3e.getStackTrace()));
+            GlobalLogger.error(s3e.getMessage());
             if (s3e.isThrottlingException()) {
                 throw new RuntimeException(
                     exceptionGson.toJson(

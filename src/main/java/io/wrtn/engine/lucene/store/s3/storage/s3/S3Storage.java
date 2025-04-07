@@ -1,18 +1,13 @@
 package io.wrtn.engine.lucene.store.s3.storage.s3;
 
-import static io.wrtn.engine.lucene.Constants.MAX_STORAGE_REQUEST_AT_ONCE;
 import static org.apache.lucene.index.IndexFileNames.parseSegmentName;
 
 import io.wrtn.model.storage.StorageMetadata;
-import io.wrtn.util.GlobalLogger;
 import io.wrtn.util.PathBuilder;
-import io.wrtn.util.Threads;
 import java.io.IOException;
 import java.nio.file.Files;
 import io.wrtn.model.storage.File;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;

@@ -1,31 +1,16 @@
 package io.wrtn.model.event;
 
-import static io.wrtn.util.JsonParser.gson;
-
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.wrtn.model.index.Index;
 import io.wrtn.model.storage.StorageMetadata;
-import java.io.IOException;
 import java.util.Arrays;
 
 public class RefreshEvent {
 
     private String type;
     private Index index;
-    @JsonSerialize(using = JsonObjectSerializer.class)
-    @JsonDeserialize(using = JsonObjectDeserializer.class)
     JsonObject query;
-    @JsonSerialize(using = JsonArraySerializer.class)
-    @JsonDeserialize(using = JsonArrayDeserializer.class)
     JsonArray sort;
     String[] fields;
     private boolean trackScores;
@@ -36,6 +21,7 @@ public class RefreshEvent {
 
     public RefreshEvent() {
         this.query = new JsonObject();
+        this.sort = new JsonArray();
     }
 
     public Index getIndex() {
@@ -59,7 +45,9 @@ public class RefreshEvent {
     }
 
     public void setSort(JsonArray sort) {
-        this.sort = sort;
+        if (sort != null) {
+            this.sort = sort;
+        }
     }
 
     public String[] getFields() {
@@ -108,46 +96,6 @@ public class RefreshEvent {
 
     public void setIncludeVectors(boolean includeVectors) {
         this.includeVectors = includeVectors;
-    }
-
-    // Serializer
-    public static class JsonObjectSerializer extends JsonSerializer<JsonObject> {
-
-        @Override
-        public void serialize(JsonObject value, JsonGenerator gen, SerializerProvider provider)
-            throws IOException {
-            gen.writeRawValue(value.toString());
-        }
-    }
-
-    // Deserializer
-    public static class JsonObjectDeserializer extends JsonDeserializer<JsonObject> {
-
-        @Override
-        public JsonObject deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException {
-            return gson.fromJson(p.readValueAsTree().toString(), JsonObject.class);
-        }
-    }
-
-    // Serializer
-    public static class JsonArraySerializer extends JsonSerializer<JsonArray> {
-
-        @Override
-        public void serialize(JsonArray value, JsonGenerator gen, SerializerProvider provider)
-            throws IOException {
-            gen.writeRawValue(value.toString());
-        }
-    }
-
-    // Deserializer
-    public static class JsonArrayDeserializer extends JsonDeserializer<JsonArray> {
-
-        @Override
-        public JsonArray deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException {
-            return gson.fromJson(p.readValueAsTree().toString(), JsonArray.class);
-        }
     }
 
     public StorageMetadata getStorageMetadata() {

@@ -6,6 +6,7 @@ import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import io.wrtn.model.document.Document;
 import io.wrtn.model.document.RefreshedDocs;
+import org.apache.commons.text.StringEscapeUtils;
 
 public final class JsonParser {
 
@@ -16,11 +17,16 @@ public final class JsonParser {
         .create();
 
     public static Document[] parseDocuments(String json) {
-        return gson.fromJson(json, Document[].class);
+        String jsonString = StringEscapeUtils.unescapeJson(json);
+        return gson.fromJson(jsonString.substring(1, jsonString.length() - 1),
+            Document[].class);
+
     }
 
     public static RefreshedDocs parseRefreshedDocs(String json) {
-        return gson.fromJson(json, RefreshedDocs.class);
+        String jsonString = StringEscapeUtils.unescapeJson(json);
+        return gson.fromJson(jsonString.substring(1, jsonString.length() - 1),
+            RefreshedDocs.class);
     }
 
     public static <T> T parseRequestBody(String body, Class<T> classOfT)

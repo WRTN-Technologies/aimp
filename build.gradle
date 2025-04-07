@@ -2,12 +2,10 @@ import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCach
 
 plugins {
     id 'java'
-    id 'io.quarkus' version "3.13.2"
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group 'io.wrtn'
-version '1.0.0'
 
 java {
     toolchain {
@@ -18,10 +16,6 @@ java {
 repositories {
     mavenCentral()
     mavenLocal()
-    // Maven Central Snapshots
-    maven {
-        url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-    }
 }
 
 configurations {
@@ -62,6 +56,8 @@ dependencies {
 
     implementation("org.jboss.logging:jboss-logging:3.6.1.Final")
     implementation("org.jboss.logmanager:jboss-logmanager:3.1.2.Final")
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("org.slf4j:slf4j-simple:2.0.17")
 
     configurations.configureEach {
         exclude group: 'software.amazon.awssdk', module: 'netty-nio-client'
@@ -69,23 +65,14 @@ dependencies {
     }
 }
 
-sourceSets {
-    main {
-        java {
-            exclude('io/wrtn/lambda/IndexBuilder')
-            exclude('io/wrtn/engine/lucene/IndexBuildHelper')
-        }
+task buildZip(type: Zip) {
+    into('lib') {
+        from(jar)
+        from(configurations.runtimeClasspath)
     }
 }
 
-compileJava {
-    options.encoding = 'UTF-8'
-    options.compilerArgs << '-parameters'
-}
-
-compileTestJava {
-    options.encoding = 'UTF-8'
-}
+build.dependsOn buildZip
 
 shadowJar {
     mergeServiceFiles()

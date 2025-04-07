@@ -58,7 +58,6 @@ public class IndexBuilder {
         long startTimeSeconds = System.currentTimeMillis() / 1000;
         IndexBuildHelper indexBuildHelper = null;
         try {
-
             validateEvent(event);
 
             // Update index metadata to acquire write lock

@@ -38,11 +38,9 @@ DESIRED_MEMORY_TO_STORAGE_RATIO_STD = config.get("DesiredMemoryToStorageRatioStd
 DESIRED_MEMORY_TO_STORAGE_RATIO_IA = config.get("DesiredMemoryToStorageRatioIa")
 MEMORY_SIZE_PER_COMPUTE_NODE_STD = config.get("MemorySizePerComputeNodeStd")
 MEMORY_SIZE_PER_COMPUTE_NODE_IA = config.get("MemorySizePerComputeNodeIa")
-DESIRED_LAMBDA_CONCURRENCY = config.get("DesiredLambdaConcurrency")
 
-LAYER_LOCAL_PATH = config.get("LayerLocalPath")
-LAYER_S3_KEY = config.get("LayerS3Key")
 FUNCTION_LOCAL_PATH = config.get("FunctionLocalPath")
+FUNCTION_S3_KEY = config.get("FunctionS3Key")
 
 DEFAULT_LAMBDA_TIMEOUT = config.get("DefaultLambdaTimeout")
 DEFAULT_LAMBDA_STORAGE_SIZE_MB = config.get("DefaultLambdaStorageSizeMB")
@@ -84,11 +82,3 @@ SCHEDULER_MAXIMUM_RETRY_ATTEMPTS = config.get_int("SchedulerMaximumRetryAttempts
 
 WAL_PAYLOAD_SIZE_THRESHOLD = config.get("WalPayloadSizeThreshold")
 BULK_UPSERT_SIZE_LIMIT_MB = config.get("BulkUpsertSizeLimitMb")
-
-SLACK_ALERT_ENABLED = config.get_bool("SlackAlertEnabled")
-SLACK_ALERT_WEBHOOK_TOKEN = config.get("SlackAlertWebHookToken")
-SLACK_ALERT_CHANNEL_ID = config.get("SlackAlertChannelId")
-ALERTER_ZIP_FILE = config.get("AlerterZipFile")
-ALERTER_S3_KEY = config.get("AlerterS3Key")
-ALERTER_HASH_FILE = config.get("AlerterHashFile")
-ALERTER_BUILDER_PATH = config.get("AlerterBuilderPath")

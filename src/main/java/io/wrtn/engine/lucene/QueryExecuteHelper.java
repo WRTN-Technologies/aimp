@@ -111,7 +111,7 @@ public class QueryExecuteHelper {
 
         TopDocs topDocs;
         Query query;
-        if (sortArray == null) {
+        if (sortArray == null || sortArray.isEmpty()) {
             query = SearchQueryBuilder.build(jsonQuery, mappings);
             topDocs = searcher.search(query, size);
             return fetchDocuments(topDocs, includeVectors, true, fields).toArray(new Document[0]);
