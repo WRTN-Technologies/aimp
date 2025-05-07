@@ -33,6 +33,10 @@ from config import (
     MAX_NUM_COMPUTE_NODES_IA,
 )
 
+# VPC
+VPC_BASE_NAME = f"{DEFAULT_PREFIX}-vpc"
+VPC_NAME = f"{VPC_BASE_NAME}-{ENV}"
+
 # EFS
 EFS_BASE_NAME = f"{DEFAULT_PREFIX}-efs"
 EFS_NAME = f"{EFS_BASE_NAME}-{ENV}"

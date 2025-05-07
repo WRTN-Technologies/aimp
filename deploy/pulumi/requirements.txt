@@ -3,3 +3,4 @@ pulumi-aws==6.68.0
 pulumi-std==2.2.0
 pulumi_docker_build==0.0.10
 pulumi-aws-apigateway==2.6.2
+pulumi-awsx==2.21.1

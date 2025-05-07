@@ -12,12 +12,6 @@ RESOURCE_TIMEOUT = config.get("ResourceTimeout")
 
 API_VERSION = config.get("ApiVersion")
 
-VPC_ID = config.get("VpcId")
-VPC_SECURITY_GROUP_ID = config.get("VpcSecurityGroupId")
-VPC_PRIVATE_SUBNET_ID0 = config.get("VpcPrivateSubnetId0")
-VPC_PRIVATE_SUBNET_ID1 = config.get("VpcPrivateSubnetId1")
-VPC_PRIVATE_SUBNET_ID2 = config.get("VpcPrivateSubnetId2")
-
 QUERY_EXECUTOR_QUALIFIER = config.get("QueryExecutorQualifier")
 
 INDEX_BUILDER_TIMEOUT = config.get("IndexBuilderTimeout")

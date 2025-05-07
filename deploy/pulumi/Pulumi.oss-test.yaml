@@ -4,23 +4,11 @@ config:
       Service: aimp
       Environment: oss-test
   aws:region: ap-northeast-2
-  aimp:AccountId: <account id>
+  aimp:AccountId: <AWS Account ID>
   aimp:Env: oss-test
   aimp:ResourceTimeout: 5m
   aimp:DefaultPrefix: aimp
   aimp:ApiVersion: oss-test
-
-  # [To Do]
-  # Make VPC Configuration as stack reference
-  #######################################
-  ##### VPC Configuration ###############
-  #######################################
-
-  aimp:VpcId: <vpc id>
-  aimp:VpcSecurityGroupId: <security group id>
-  aimp:VpcPrivateSubnetId0: <vpc subnet id 0>
-  aimp:VpcPrivateSubnetId1: <vpc subnet id 1>
-  aimp:VpcPrivateSubnetId2: <vpc subnet id 2>
 
   #######################################
   ##### Global Lambda Configuration #####
