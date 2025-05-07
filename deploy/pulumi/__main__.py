@@ -4,14 +4,10 @@ import pulumi_docker_build as docker_build
 import pulumi_std as std
 import json
 import pulumi_aws_apigateway as apigateway
+import pulumi_awsx as awsx
 
 from config import (
     ENV,
-    VPC_ID,
-    VPC_SECURITY_GROUP_ID,
-    VPC_PRIVATE_SUBNET_ID0,
-    VPC_PRIVATE_SUBNET_ID1,
-    VPC_PRIVATE_SUBNET_ID2,
     FUNCTION_LOCAL_PATH,
     INDEX_BUILDER_LOCAL_PATH,
     INDEX_BUILDER_DOCKER_FILE_PATH,
@@ -145,6 +141,7 @@ from variables import (
     LAMBDA_ARM_ARCHITECTURE,
     BATCH_X86_ARCHITECTURE,
     FUNCTION_OBJECT_NAME,
+    VPC_NAME,
 )
 
 def query_executor(id, index_class):
@@ -182,17 +179,14 @@ def query_executor(id, index_class):
         timeout=DEFAULT_LAMBDA_TIMEOUT,
         environment=get_lambda_environment_config(QUERY_EXECUTOR_QUALIFIER),
         vpc_config=aws.lambda_.FunctionVpcConfigArgs(
-            security_group_ids=[VPC_SECURITY_GROUP_ID],
-            subnet_ids=[
-                VPC_PRIVATE_SUBNET_ID0,
-                VPC_PRIVATE_SUBNET_ID1,
-                VPC_PRIVATE_SUBNET_ID2,
-            ],
+            security_group_ids=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
+            subnet_ids=vpc.private_subnet_ids.apply(lambda ids: ids),
         ),
         logging_config=LOG_CONFIG,
         publish=True,
         opts=pulumi.ResourceOptions(
             depends_on=[
+                vpc,
                 log_group,
                 query_executor_role,
                 function_object
@@ -282,6 +276,12 @@ def make_container_properties():
             }
         )
     )
+
+# Create VPC
+vpc = awsx.ec2.Vpc(VPC_NAME, awsx.ec2.VpcArgs(
+    number_of_availability_zones=3,
+    enable_dns_hostnames=True,
+))
 
 # Create admin API key and usage plan
 admin_api_key = aws.apigateway.ApiKey(
@@ -1488,30 +1488,30 @@ efs = aws.efs.FileSystem(
 efs_mount_target0 = aws.efs.MountTarget(
     EFS_MOUNT_TARGET_NAME0,
     file_system_id=efs.id,
-    subnet_id=VPC_PRIVATE_SUBNET_ID0,
-    security_groups=[VPC_SECURITY_GROUP_ID],
+    subnet_id=vpc.private_subnet_ids.apply(lambda ids: ids[0]),
+    security_groups=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
     opts=pulumi.ResourceOptions(
-        depends_on=[efs],
+        depends_on=[efs, vpc],
     ),
 )
 
 efs_mount_target1 = aws.efs.MountTarget(
     EFS_MOUNT_TARGET_NAME1,
     file_system_id=efs.id,
-    subnet_id=VPC_PRIVATE_SUBNET_ID1,
-    security_groups=[VPC_SECURITY_GROUP_ID],
+    subnet_id=vpc.private_subnet_ids.apply(lambda ids: ids[1]),
+    security_groups=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
     opts=pulumi.ResourceOptions(
-        depends_on=[efs],
+        depends_on=[efs, vpc],
     ),
 )
 
 efs_mount_target2 = aws.efs.MountTarget(
     EFS_MOUNT_TARGET_NAME2,
     file_system_id=efs.id,
-    subnet_id=VPC_PRIVATE_SUBNET_ID2,
-    security_groups=[VPC_SECURITY_GROUP_ID],
+    subnet_id=vpc.private_subnet_ids.apply(lambda ids: ids[2]),
+    security_groups=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
     opts=pulumi.ResourceOptions(
-        depends_on=[efs],
+        depends_on=[efs, vpc],
     ),
 )
 
@@ -1569,12 +1569,8 @@ command_controller = aws.lambda_.Function(
     timeout=COMMAND_CONTROLLER_TIMEOUT,
     environment=get_lambda_environment_config(COMMAND_CONTROLLER_QUALIFIER),
     vpc_config=aws.lambda_.FunctionVpcConfigArgs(
-        security_group_ids=[VPC_SECURITY_GROUP_ID],
-        subnet_ids=[
-            VPC_PRIVATE_SUBNET_ID0,
-            VPC_PRIVATE_SUBNET_ID1,
-            VPC_PRIVATE_SUBNET_ID2,
-        ],
+        security_group_ids=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
+        subnet_ids=vpc.private_subnet_ids.apply(lambda ids: ids),
     ),
     logging_config=LOG_CONFIG,
     publish=True,
@@ -1584,6 +1580,7 @@ command_controller = aws.lambda_.Function(
     },
     opts=pulumi.ResourceOptions(
         depends_on=[
+            vpc,
             command_controller_log_group,
             control_queue,
             command_controller_role,
@@ -1624,12 +1621,8 @@ index_refresher = aws.lambda_.Function(
     timeout=DEFAULT_LAMBDA_TIMEOUT,
     environment=get_lambda_environment_config(INDEX_REFRESHER_QUALIFIER),
     vpc_config=aws.lambda_.FunctionVpcConfigArgs(
-        security_group_ids=[VPC_SECURITY_GROUP_ID],
-        subnet_ids=[
-            VPC_PRIVATE_SUBNET_ID0,
-            VPC_PRIVATE_SUBNET_ID1,
-            VPC_PRIVATE_SUBNET_ID2,
-        ],
+        security_group_ids=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
+        subnet_ids=vpc.private_subnet_ids.apply(lambda ids: ids),
     ),
     logging_config=LOG_CONFIG,
     publish=True,
@@ -1639,6 +1632,7 @@ index_refresher = aws.lambda_.Function(
     },
     opts=pulumi.ResourceOptions(
         depends_on=[
+            vpc,
             index_refresher_log_group,
             index_refresher_role,
             efs_access_point,
@@ -1684,12 +1678,8 @@ request_controller = aws.lambda_.Function(
     timeout=DEFAULT_LAMBDA_TIMEOUT,
     environment=get_lambda_environment_config(REQUEST_CONTROLLER_QUALIFIER),
     vpc_config=aws.lambda_.FunctionVpcConfigArgs(
-        security_group_ids=[VPC_SECURITY_GROUP_ID],
-        subnet_ids=[
-            VPC_PRIVATE_SUBNET_ID0,
-            VPC_PRIVATE_SUBNET_ID1,
-            VPC_PRIVATE_SUBNET_ID2,
-        ],
+        security_group_ids=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
+        subnet_ids=vpc.private_subnet_ids.apply(lambda ids: ids),
     ),
     logging_config=LOG_CONFIG,
     publish=True,
@@ -1699,6 +1689,7 @@ request_controller = aws.lambda_.Function(
     },
     opts=pulumi.ResourceOptions(
         depends_on=[
+            vpc,
             request_controller_log_group,
             request_controller_role,
             function_object
@@ -1736,10 +1727,15 @@ query_controller = aws.lambda_.Function(
     ephemeral_storage=DEFAULT_STORAGE_CONFIG,
     timeout=DEFAULT_LAMBDA_TIMEOUT,
     environment=get_lambda_environment_config(QUERY_CONTROLLER_QUALIFIER),
+    vpc_config=aws.lambda_.FunctionVpcConfigArgs(
+        security_group_ids=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
+        subnet_ids=vpc.private_subnet_ids.apply(lambda ids: ids),
+    ),
     logging_config=LOG_CONFIG,
     publish=True,
     opts=pulumi.ResourceOptions(
         depends_on=[
+            vpc,
             query_controller_log_group,
             query_controller_role,
             function_object
@@ -1997,17 +1993,13 @@ compute_environment = aws.batch.ComputeEnvironment(
     state="ENABLED",
     compute_resources=aws.batch.ComputeEnvironmentComputeResourcesArgs(
         max_vcpus=INDEX_BUILDER_MAX_COMPUTE_VCPUS,
-        security_group_ids=[VPC_SECURITY_GROUP_ID],
-        subnets=[
-            VPC_PRIVATE_SUBNET_ID0,
-            VPC_PRIVATE_SUBNET_ID1,
-            VPC_PRIVATE_SUBNET_ID2,
-        ],
+        security_group_ids=[vpc.vpc.default_security_group_id.apply(lambda id: id)],
+        subnets=vpc.private_subnet_ids.apply(lambda ids: ids),
         type="FARGATE",
     ),
     opts=pulumi.ResourceOptions(
         parent=index_builder_policy,
-        depends_on=[index_builder_policy, index_builder_role],
+        depends_on=[vpc, index_builder_policy, index_builder_role],
     ),
 )
 
@@ -2083,100 +2075,6 @@ for route in QUERY_ROUTES:
             content_type="application/json",
             api_key_required=True,
         )
-    )
-
-if ENV == "prod":
-    # Create API GW VPC endpoints
-    api_gw_vpc_endpoint = aws.ec2.VpcEndpoint(
-        API_GATEWAY_ENDPOINT_NAME,
-        vpc_id=VPC_ID,
-        service_name=f"com.amazonaws.{AWS_REGION}.execute-api",
-        vpc_endpoint_type="Interface",
-        subnet_ids=[
-            VPC_PRIVATE_SUBNET_ID0,
-            VPC_PRIVATE_SUBNET_ID1,
-            VPC_PRIVATE_SUBNET_ID2
-        ],
-        security_group_ids=[VPC_SECURITY_GROUP_ID],
-        private_dns_enabled=False,
-        tags={
-            "Name": API_GATEWAY_ENDPOINT_NAME,
-        },
-    )
-
-    # Create private API GW
-    try:
-        get_private_api = aws.apigateway.get_rest_api(name=API_GATEWAY_NAME_PRIVATE)
-        private_api_resource_arn = f"arn:aws:execute-api:{AWS_REGION}:{AWS_ACCOUNT_ID}:{get_private_api.id}/*/*/*"
-    except:
-        private_api_resource_arn = "execute-api/*/*/*"
-
-    def rest_api_transform_private(args):
-        if args.type_ == "aws:apigateway/restApi:RestApi":
-            args.props["fail_on_warnings"] = True
-            args.props["endpoint_configuration"] = {
-                "types": "PRIVATE",
-                "vpc_endpoint_ids": [
-                    api_gw_vpc_endpoint.id,
-                ]
-            }
-            args.props["policy"] = json.dumps({
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": "*",
-                        "Action": "execute-api:Invoke",
-                        "Resource": private_api_resource_arn
-                    }
-                ]
-            })
-
-            return pulumi.ResourceTransformResult(args.props, args.opts)
-
-    api_private = apigateway.RestAPI(
-        API_GATEWAY_NAME_PRIVATE,
-        api_key_source=apigateway.APIKeySource.HEADER,
-        routes=routes_settings,
-        stage_name=API_VERSION,
-        binary_media_types=[],
-        opts=pulumi.ResourceOptions(
-            depends_on=[
-                request_controller,
-                query_controller,
-                api_gateway_log_group,
-                api_gw_vpc_endpoint
-            ],
-            transforms=[rest_api_transform_private],
-        ),
-    )
-
-    aws.lambda_.Permission(
-        "api-private-http-request-lambda-permission",
-        action="lambda:invokeFunction",
-        function=request_controller.name,
-        principal="apigateway.amazonaws.com",
-        source_arn=api_private.api.execution_arn.apply(lambda arn: arn + "*/*"),
-        opts=pulumi.ResourceOptions(
-            depends_on=[
-                api_private,
-                request_controller,
-            ]
-        ),
-    )
-
-    aws.lambda_.Permission(
-        "api-private-http-query-lambda-permission",
-        action="lambda:invokeFunction",
-        function=query_controller.name,
-        principal="apigateway.amazonaws.com",
-        source_arn=api_private.api.execution_arn.apply(lambda arn: arn + "*/*"),
-        opts=pulumi.ResourceOptions(
-            depends_on=[
-                api_private,
-                query_controller,
-            ]
-        ),
     )
 
 # Create API Gateway
